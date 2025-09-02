@@ -51,7 +51,7 @@
     if (predictions.length > 0) {
       const best = predictions.reduce((a, b) => (a.score > b.score ? a : b));
       statusEl.textContent = `Detected: ${best.class} (${(best.score*100).toFixed(1)}%)`;
-      fetch("ip/detect", {
+      fetch("https://ai-chef-page.vercel.app/detect", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ object: best.class, confidence: best.score, timestamp: Date.now() })
@@ -63,12 +63,17 @@
   }
 
   (async () => {
-    statusEl.textContent = "Requesting camera...";
-    await setupCamera();
-    statusEl.textContent = "Loading model...";
-    await loadModel();
-    detectFrame();
-  })();
+  statusEl.textContent = "Requesting camera...";
+  const cam = await setupCamera();
+  if (!cam) {
+    statusEl.textContent = "❌ Cannot start detection – no camera stream.";
+    return; // stop here if camera fails
+  }
+  statusEl.textContent = "Loading model...";
+  await loadModel();
+  detectFrame();
+})();
+
 </script>
 
 </body>
