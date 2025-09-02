@@ -1,0 +1,75 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>AI Chef Camera</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+</head>
+<body style="text-align:center; background:#111; color:white;">
+  <h2>🍳 AI Chef Live Detection</h2>
+  <video id="video" autoplay playsinline style="width:90%; border-radius:12px;"></video>
+  <p id="status">Loading model...</p>
+
+  <script>
+  const video = document.getElementById("video");
+  const statusEl = document.getElementById("status");
+  let model;
+  
+
+
+    async function setupCamera() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" }, audio: false
+      });
+      video.srcObject = stream;
+      return new Promise(resolve => {
+        video.onloadedmetadata = () => resolve(video);
+      });
+    } catch (err) {
+      console.error("Camera error:", err);
+      statusEl.textContent = "❌ Camera access failed: " + err.name + " – " + err.message;
+    }
+  }
+
+
+  async function loadModel() {
+    try {
+      model = await cocoSsd.load();
+      statusEl.textContent = "✅ Model loaded. Detecting objects...";
+    } catch (err) {
+      console.error("Model load error:", err);
+      statusEl.textContent = "❌ Failed to load model: " + err.message;
+    }
+  }
+
+  async function detectFrame() {
+    if (!model) return;
+    const predictions = await model.detect(video);
+    if (predictions.length > 0) {
+      const best = predictions.reduce((a, b) => (a.score > b.score ? a : b));
+      statusEl.textContent = `Detected: ${best.class} (${(best.score*100).toFixed(1)}%)`;
+      fetch("ip/detect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ object: best.class, confidence: best.score, timestamp: Date.now() })
+      }).catch(err => console.error("POST failed", err));
+    } else {
+      statusEl.textContent = "No objects detected.";
+    }
+    requestAnimationFrame(detectFrame);
+  }
+
+  (async () => {
+    statusEl.textContent = "Requesting camera...";
+    await setupCamera();
+    statusEl.textContent = "Loading model...";
+    await loadModel();
+    detectFrame();
+  })();
+</script>
+
+</body>
+</html> 
